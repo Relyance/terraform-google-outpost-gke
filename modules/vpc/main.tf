@@ -1,11 +1,13 @@
 resource "google_compute_network" "main" {
   name                    = var.base_name
+  project                 = var.project_id
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
 }
 
 resource "google_compute_subnetwork" "main" {
   name          = var.base_name
+  project       = var.project_id
   ip_cidr_range = var.subnet_cidr
   region        = var.region
   network       = google_compute_network.main.id
@@ -26,12 +28,14 @@ resource "google_compute_subnetwork" "main" {
 
 resource "google_compute_router" "main" {
   name    = var.base_name
+  project = var.project_id
   network = google_compute_network.main.name
   region  = var.region
 }
 
 resource "google_compute_router_nat" "main" {
   name                               = var.base_name
+  project                            = var.project_id
   router                             = google_compute_router.main.name
   region                             = var.region
   nat_ip_allocate_option             = "AUTO_ONLY"

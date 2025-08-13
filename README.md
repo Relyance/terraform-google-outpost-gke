@@ -35,7 +35,15 @@ You can configure this behavior using the `enable_public_endpoint` flag:
 - If `enable_public_endpoint = true`: a public IP is assigned to the control plane, and access is allowed only from CIDRs listed in `control_plane_allowed_cidrs`.
 - If `enable_public_endpoint = false` (default): no public IP is created, and **only internal routes** can be used for access.
 
-> ⚠️ If you include public IP ranges (e.g., `34.x.x.x/32`) in `control_plane_allowed_cidrs` **without** setting `enable_public_endpoint = true`, Terraform will fail with a validation error.
+> If you include public IP ranges (e.g., `34.x.x.x/32`) in `control_plane_allowed_cidrs` **without** setting `enable_public_endpoint = true`, Terraform will fail with a validation error.
+
+## Using an Existing GKE Cluster
+
+If you provide the name of an **existing** GKE cluster instead of creating a new one, this module will validate that it is running in **Autopilot** mode.
+
+- This validation requires the **gcloud CLI** to be installed on the system running Terraform.  
+  Install instructions: [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install)
+- If you want to skip this validation (for example, if you are certain your cluster is Autopilot but do not want to install the CLI), set `require_autopilot_cluster = false`.
 
 ### Accessing Private GKE Clusters
 
@@ -88,33 +96,51 @@ This may be undesirable for security or compliance sensitive environments.
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_existing_gke"></a> [existing\_gke](#module\_existing\_gke) | ./modules/existing_gke | n/a |
+| <a name="module_gcs_buckets"></a> [gcs\_buckets](#module\_gcs\_buckets) | terraform-google-modules/cloud-storage/google | 11.0.0 |
 | <a name="module_gke"></a> [gke](#module\_gke) | ./modules/gke | n/a |
+| <a name="module_kms"></a> [kms](#module\_kms) | terraform-google-modules/kms/google | ~> 4.0 |
 | <a name="module_vpc"></a> [vpc](#module\_vpc) | ./modules/vpc | n/a |
 
 ## Resources
 
 | Name | Type |
 |------|------|
+| [google_kms_crypto_key_iam_member.gke_control_plane_kms](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/kms_crypto_key_iam_member) | resource |
+| [google_project_iam_member.gke_node_defaultrole](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_service.required](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_service) | resource |
+| [google_service_account.gke_nodes](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
 | [google_project.current](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
+| [google_storage_project_service_account.gcs_sa](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/storage_project_service_account) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_base_name"></a> [base\_name](#input\_base\_name) | base name for all resources | `string` | `"relyance-inhost"` | no |
-| <a name="input_control_plane_allowed_cidrs"></a> [control\_plane\_allowed\_cidrs](#input\_control\_plane\_allowed\_cidrs) | Map of CIDR blocks to their descriptions for who can access the GKE control plane endpoint. If you want to allow public IPs (e.g., 34.x.x.x), you must also set `enable_public_endpoint = true`. | `map(string)` | `{}` | no |
+| <a name="input_bucket_admins"></a> [bucket\_admins](#input\_bucket\_admins) | Per-bucket principals for roles/storage.objectAdmin (object-level full access; no IAM). | `map(list(string))` | `{}` | no |
+| <a name="input_bucket_creators"></a> [bucket\_creators](#input\_bucket\_creators) | Per-bucket principals for roles/storage.objectCreator. | `map(list(string))` | `{}` | no |
+| <a name="input_bucket_storage_admins"></a> [bucket\_storage\_admins](#input\_bucket\_storage\_admins) | Per-bucket principals for roles/storage.admin (bucket + object admin incl. IAM/settings). | `map(list(string))` | `{}` | no |
+| <a name="input_bucket_viewers"></a> [bucket\_viewers](#input\_bucket\_viewers) | Per-bucket principals for roles/storage.objectViewer. | `map(list(string))` | `{}` | no |
+| <a name="input_code_analysis_enabled"></a> [code\_analysis\_enabled](#input\_code\_analysis\_enabled) | Whether to create the SCI bucket | `bool` | `false` | no |
+| <a name="input_control_plane_allowed_cidrs"></a> [control\_plane\_allowed\_cidrs](#input\_control\_plane\_allowed\_cidrs) | Map of CIDR blocks to their descriptions for who can access the GKE control plane endpoint.<br/>If you want to allow public IPs (e.g., 34.x.x.x), you must also set `enable_public_endpoint = true`. | `map(string)` | `{}` | no |
 | <a name="input_create_vpc_and_gke"></a> [create\_vpc\_and\_gke](#input\_create\_vpc\_and\_gke) | If false, assumes external VPC and GKE exist and skips their creation | `bool` | `true` | no |
 | <a name="input_enable_public_endpoint"></a> [enable\_public\_endpoint](#input\_enable\_public\_endpoint) | Whether to expose a public endpoint for the GKE control plane (alongside private endpoint). | `bool` | `false` | no |
 | <a name="input_env"></a> [env](#input\_env) | What environment are you accessing [stage, prod]? | `string` | n/a | yes |
 | <a name="input_existing_gke_location"></a> [existing\_gke\_location](#input\_existing\_gke\_location) | Location of existing GKE cluster (used if create\_vpc\_and\_gke = false).<br/><br/>This can be either a region (e.g. "us-central1") for regional clusters,<br/>or a zone (e.g. "us-central1-a") for zonal clusters.<br/><br/>Note: We recommend using **regional** GKE clusters for better availability and resilience. | `string` | `null` | no |
 | <a name="input_existing_gke_name"></a> [existing\_gke\_name](#input\_existing\_gke\_name) | Name of existing GKE cluster to use (if create\_vpc\_and\_gke = false) | `string` | `null` | no |
+| <a name="input_findings_bucket_expiration_days"></a> [findings\_bucket\_expiration\_days](#input\_findings\_bucket\_expiration\_days) | Number of days before objects in findings bucket expire | `number` | `180` | no |
+| <a name="input_gcs_bucket_suffix"></a> [gcs\_bucket\_suffix](#input\_gcs\_bucket\_suffix) | Suffix to add to bucket name to avoid (unexpected) collision. Contact Relyance if set | `string` | `null` | no |
+| <a name="input_kms_key_destroy_scheduled_duration"></a> [kms\_key\_destroy\_scheduled\_duration](#input\_kms\_key\_destroy\_scheduled\_duration) | Destruction delay for scheduled key version destroy. | `string` | `"2592000s"` | no |
+| <a name="input_kms_key_rotation_period"></a> [kms\_key\_rotation\_period](#input\_kms\_key\_rotation\_period) | Rotation period for the CMEK in seconds. | `string` | `"2592000s"` | no |
+| <a name="input_kms_prevent_destroy"></a> [kms\_prevent\_destroy](#input\_kms\_prevent\_destroy) | Protect KMS resources from accidental terraform destroy. | `bool` | `true` | no |
 | <a name="input_master_ipv4_cidr_block"></a> [master\_ipv4\_cidr\_block](#input\_master\_ipv4\_cidr\_block) | The /28 CIDR block to use for the GKE master's private VPC connection (e.g., 172.16.0.0/28). | `string` | `""` | no |
 | <a name="input_pods_cidr"></a> [pods\_cidr](#input\_pods\_cidr) | CIDR block used for GKE Pod IPs (IP aliasing) | `string` | `""` | no |
 | <a name="input_project_id"></a> [project\_id](#input\_project\_id) | The GCP project where the resources will be created | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | GCP region in which all resources will be created | `string` | n/a | yes |
+| <a name="input_require_existing_gke_autopilot"></a> [require\_existing\_gke\_autopilot](#input\_require\_existing\_gke\_autopilot) | Set false to allow existing GKE cluster that is not Autopilot | `bool` | `true` | no |
 | <a name="input_services_cidr"></a> [services\_cidr](#input\_services\_cidr) | CIDR block used for GKE Services (ClusterIP ranges) | `string` | `""` | no |
 | <a name="input_subnet_cidr"></a> [subnet\_cidr](#input\_subnet\_cidr) | CIDR block for the primary subnet used for GKE nodes | `string` | `""` | no |
+| <a name="input_work_bucket_expiration_days"></a> [work\_bucket\_expiration\_days](#input\_work\_bucket\_expiration\_days) | Number of days before objects in work bucket expire | `number` | `7` | no |
 
 ## Outputs
 

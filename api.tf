@@ -9,6 +9,7 @@ locals {
     "monitoring.googleapis.com",
     "storage.googleapis.com",
     "pubsub.googleapis.com",
+    "cloudkms.googleapis.com",
   ]
 }
 

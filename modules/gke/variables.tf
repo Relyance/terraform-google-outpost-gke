@@ -60,3 +60,13 @@ variable "enable_public_endpoint" {
   description = "Whether to expose a public endpoint for the GKE control plane (alongside private endpoint)."
   type        = bool
 }
+
+variable "node_service_account" {
+  description = "Service Account for GKE Autopilot Nodes"
+  type        = string
+}
+
+variable "cmek_key_name" {
+  description = "CMEK crypto key name used for GCS encryption."
+  type        = string
+}

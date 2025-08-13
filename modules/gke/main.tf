@@ -21,8 +21,17 @@ module "gke_cluster" {
   enable_private_endpoint = var.enable_public_endpoint ? false : true
   master_ipv4_cidr_block  = var.master_ipv4_cidr_block
 
-  ip_range_pods     = var.ip_range_pods
-  ip_range_services = var.ip_range_services
+  ip_range_pods          = var.ip_range_pods
+  ip_range_services      = var.ip_range_services
+  create_service_account = false
+  service_account        = var.node_service_account
+
+  database_encryption = [
+    {
+      state    = "ENCRYPTED"
+      key_name = var.cmek_key_name
+    }
+  ]
 
   deletion_protection        = false
   master_authorized_networks = local.master_authorized_networks

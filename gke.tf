@@ -2,6 +2,8 @@ module "gke" {
   source = "./modules/gke"
   count  = var.create_vpc_and_gke ? 1 : 0
 
+  depends_on = [google_kms_crypto_key_iam_member.gke_control_plane_kms]
+
   project_id             = var.project_id
   region                 = var.region
   network                = module.vpc[0].vpc_name
@@ -11,6 +13,8 @@ module "gke" {
   ip_range_pods          = "pods"
   ip_range_services      = "services"
   enable_public_endpoint = var.enable_public_endpoint
+  cmek_key_name          = module.kms.keys[local.cmek_key_name]
+  node_service_account   = google_service_account.gke_nodes[0].email
 
   control_plane_allowed_cidrs = var.control_plane_allowed_cidrs
 }

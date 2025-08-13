@@ -12,3 +12,8 @@ variable "project" {
   description = "GCP project ID where the existing cluster lives"
   type        = string
 }
+
+variable "require_autopilot_cluster" {
+  description = "Set false to allow existing GKE cluster that is not Autopilot"
+  type        = bool
+}

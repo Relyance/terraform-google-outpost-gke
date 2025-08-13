@@ -22,6 +22,8 @@ module "existing_gke" {
   name     = var.existing_gke_name
   location = var.existing_gke_location
   project  = var.project_id
+
+  require_autopilot_cluster = var.require_existing_gke_autopilot
 }
 
 locals {

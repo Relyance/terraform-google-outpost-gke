@@ -97,3 +97,10 @@ variable "enable_public_endpoint" {
   type        = bool
   default     = false
 }
+
+variable "require_existing_gke_autopilot" {
+  description = "Set false to allow existing GKE cluster that is not Autopilot"
+  type        = bool
+  default     = true
+}
+

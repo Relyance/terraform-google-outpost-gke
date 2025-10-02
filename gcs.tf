@@ -1,11 +1,21 @@
 locals {
   bucket_prefix = var.gcs_bucket_suffix != null ? var.gcs_bucket_suffix : "${var.base_name}-${data.google_project.current.number}"
 
-  ksa_namespace = "inhost"
+  ksa_namespace = "sierra" # While InHost is public name, "sierra" still used internally as namespace
   ksa_name      = "relyance"
   ksa_principal = "principal://iam.googleapis.com/projects/${data.google_project.current.number}/locations/global/workloadIdentityPools/${var.project_id}.svc.id.goog/subject/ns/${local.ksa_namespace}/sa/${local.ksa_name}"
 
   bucket_names = var.code_analysis_enabled ? ["findings", "work", "sci"] : ["findings", "work"]
+
+  bucket_viewers_by_bucket = {
+    for b in local.bucket_names : b =>
+    compact(
+      concat(
+        [local.ksa_principal], # KSA can read basic bucket info for everything.
+        lookup(var.bucket_viewers, b, [])
+      )
+    )
+  }
 
   # Compose effective per-bucket membership for each role:
   # - Always include KSA on: work (objectAdmin), findings (viewer + creator)
@@ -97,7 +107,7 @@ module "gcs_buckets" {
     for b in local.bucket_names : b => module.kms.keys[local.cmek_key_name]
   }
 
-  bucket_viewers        = local.viewers_by_bucket
+  bucket_viewers        = local.viewers_by_bucket # NOTE: bucket_viewers only get object viewer access.
   bucket_creators       = local.creators_by_bucket
   bucket_admins         = local.admins_by_bucket
   bucket_storage_admins = local.storage_admins_by_bucket
@@ -106,4 +116,14 @@ module "gcs_buckets" {
   set_creator_roles       = local.set_creator_roles
   set_admin_roles         = local.set_admin_roles
   set_storage_admin_roles = local.set_storage_admin_roles
+}
+
+# The module assumes viewers only need access to _objects_.
+# Some Relyance code, however, will need to execute storage.buckets.get as well.
+# NOTE: this is a BINDING, not a MEMBER, so owns the bucketViewer role for these buckets.
+resource "google_storage_bucket_iam_binding" "bucket_viewer_access" {
+  for_each = local.bucket_viewers_by_bucket
+  bucket   = module.gcs_buckets.buckets_map[each.key].name
+  members  = each.value
+  role     = "roles/storage.bucketViewer"
 }

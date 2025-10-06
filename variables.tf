@@ -12,6 +12,7 @@ variable "base_name" {
 variable "env" {
   description = "What environment are you accessing [stage, prod]?"
   type        = string
+  default     = "prod"
 }
 
 variable "project_id" {

@@ -1,4 +1,4 @@
-# Sierra Core Environment in GCP Terraform Module
+# InHost Core Environment in GCP Terraform Module
 
 ## Introduction
 
@@ -6,22 +6,36 @@ This module is provided for use by customers of Relyance AI. Visit [relyance.ai]
 
 ## Usage
 
-When you have agreed to sign up for Sierra, this module provisions the core infrastructure in your GCP project.
+When you have agreed to sign up for InHost, this module provisions the core infrastructure in your GCP project.
 
 You will need to provide:
 
 - Subnet CIDR blocks for your regions
 - CIDR blocks for control plane (GKE) access
-- Your environment (`stage`, `prod`, etc.)
 
 ### Resources Created
 
-All resources will have labels identifying them as part of `relyance-inhost`. [TBD: [RD-29657](https://relyance.atlassian.net/browse/RD-29657)]
+Terraform always creates
+
+- KMS key for encryption at rest of all cloud storage objects
+- Storage buckets for in-progress work and final findings for export back to Relyance
+
+If you are standing up a new GKE cluster rather than reusing an existing one, it also creates
 
 - A VPC network
 - Regional subnets
 - A private GKE Autopilot cluster
 - Optional: public endpoint access to the GKE control plane
+
+### Caveat on teardown:
+
+The dedicated KMS key
+
+- provides optimal security for your data, but
+- has (understandable) protections against deletion.
+
+For this reason, it is currently not possible to destroy the entire Terraform module.
+To remove most resources and minimize cost, set `create_vpc_and_gke = false`
 
 ## GKE Control Plane Access: Public vs Private Endpoints
 
@@ -75,6 +89,81 @@ This may be undesirable for security or compliance sensitive environments.
 - **Alternatively**: If you do not control org policies, you can pre-enable the `compute.googleapis.com` API outside of this module to avoid triggering default VPC creation during apply.
 - As a last resort, manually review and delete the default VPC if it was created automatically.
 
+## Examples
+
+These example files (available in `examples/*` directories) bundle everything into one file.
+You should follow organizational best practices for file structure, remote state management, etc.
+
+### Create new GKE cluster
+
+`examples/create_cluster/inhost.tf`
+```hcl
+# Single file with everything you need.
+# For local consistency during updates, run
+#     terraform init
+#     terraform plan -out inhost.tfplan
+#     terraform apply inhost.tfplan
+# For collaboration, configure backend for shared remote state file
+# For maintainability, replace hard-coded values with variables or outputs from other modules
+
+module "inhost" {
+  source = "Relyance-Ext/inhost/gcp"
+
+  project_id = "your-project-id"
+  region     = "us-central1"
+
+  # These shouldn't overlap with any resources you need to scan (via peering, NCC, VPN, etc.)
+  subnet_cidr   = "10.70.0.0/20"
+  pods_cidr     = "10.71.0.0/20"
+  services_cidr = "10.72.0.0/20"
+
+  master_ipv4_cidr_block = "172.16.16.48/28" # If you set up private access, this should be unique within your organization
+  enable_public_endpoint = true
+  control_plane_allowed_cidrs = {
+    "127.0.0.1/32" = "Your admin env or VPN" # Replace IP with real public IP!
+  }
+}
+
+provider "google" {}
+
+output "inhost" {
+  description = "Information to provide to Relyance"
+  value       = module.inhost
+}
+```
+
+### Use existing GKE cluster
+
+`examples/use_existing_cluster/inhost.tf`
+```hcl
+# Single file with everything you need.
+# For local consistency during updates, run
+#     terraform init
+#     terraform plan -out inhost.tfplan
+#     terraform apply inhost.tfplan
+# For collaboration, configure backend for shared remote state file
+# For maintainability, replace hard-coded values with variables or outputs from other modules
+
+module "inhost" {
+  source = "Relyance-Ext/inhost/gcp"
+
+  project_id = "your-project-id"
+  region     = "us-central1"
+
+  # Use an existing GKE cluster
+  create_vpc_and_gke    = false
+  existing_gke_name     = "your-cluster-name"
+  existing_gke_location = "us-central1"
+}
+
+provider "google" {}
+
+output "inhost" {
+  description = "Information to provide to Relyance"
+  value       = module.inhost
+}
+```
+
 <!-- Everything below this line is output from terraform-docs markdown table -->
 
 <!-- BEGIN_TF_DOCS -->
@@ -109,6 +198,7 @@ This may be undesirable for security or compliance sensitive environments.
 | [google_project_iam_member.gke_node_defaultrole](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_service.required](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_service) | resource |
 | [google_service_account.gke_nodes](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
+| [google_storage_bucket_iam_binding.bucket_viewer_access](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_iam_binding) | resource |
 | [google_project.current](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
 | [google_storage_project_service_account.gcs_sa](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/storage_project_service_account) | data source |
 
@@ -125,7 +215,7 @@ This may be undesirable for security or compliance sensitive environments.
 | <a name="input_control_plane_allowed_cidrs"></a> [control\_plane\_allowed\_cidrs](#input\_control\_plane\_allowed\_cidrs) | Map of CIDR blocks to their descriptions for who can access the GKE control plane endpoint.<br/>If you want to allow public IPs (e.g., 34.x.x.x), you must also set `enable_public_endpoint = true`. | `map(string)` | `{}` | no |
 | <a name="input_create_vpc_and_gke"></a> [create\_vpc\_and\_gke](#input\_create\_vpc\_and\_gke) | If false, assumes external VPC and GKE exist and skips their creation | `bool` | `true` | no |
 | <a name="input_enable_public_endpoint"></a> [enable\_public\_endpoint](#input\_enable\_public\_endpoint) | Whether to expose a public endpoint for the GKE control plane (alongside private endpoint). | `bool` | `false` | no |
-| <a name="input_env"></a> [env](#input\_env) | What environment are you accessing [stage, prod]? | `string` | n/a | yes |
+| <a name="input_env"></a> [env](#input\_env) | What environment are you accessing [stage, prod]? | `string` | `"prod"` | no |
 | <a name="input_existing_gke_location"></a> [existing\_gke\_location](#input\_existing\_gke\_location) | Location of existing GKE cluster (used if create\_vpc\_and\_gke = false).<br/><br/>This can be either a region (e.g. "us-central1") for regional clusters,<br/>or a zone (e.g. "us-central1-a") for zonal clusters.<br/><br/>Note: We recommend using **regional** GKE clusters for better availability and resilience. | `string` | `null` | no |
 | <a name="input_existing_gke_name"></a> [existing\_gke\_name](#input\_existing\_gke\_name) | Name of existing GKE cluster to use (if create\_vpc\_and\_gke = false) | `string` | `null` | no |
 | <a name="input_findings_bucket_expiration_days"></a> [findings\_bucket\_expiration\_days](#input\_findings\_bucket\_expiration\_days) | Number of days before objects in findings bucket expire | `number` | `180` | no |
@@ -147,7 +237,7 @@ This may be undesirable for security or compliance sensitive environments.
 | Name | Description |
 |------|-------------|
 | <a name="output_base_name"></a> [base\_name](#output\_base\_name) | Base name used as prefix for all GCP resources |
-| <a name="output_project_id"></a> [project\_id](#output\_project\_id) | The GCP project ID where the Sierra environment is deployed |
+| <a name="output_project_id"></a> [project\_id](#output\_project\_id) | The GCP project ID where the InHost environment is deployed |
 | <a name="output_project_number"></a> [project\_number](#output\_project\_number) | The numeric ID of the GCP project |
 | <a name="output_region"></a> [region](#output\_region) | Primary GCP region where resources are deployed |
 <!-- END_TF_DOCS -->

@@ -9,19 +9,13 @@
 module "inhost" {
   source = "Relyance-Ext/inhost/gcp"
 
-  env        = "stage"
-  project_id = "rely-rd-25500-poc-1"
+  project_id = "your-project-id"
   region     = "us-central1"
-  base_name  = "relyance-inhost"
 
   # Use an existing GKE cluster
   create_vpc_and_gke    = false
-  existing_gke_name     = "existing-cluster-test2"
+  existing_gke_name     = "your-cluster-name"
   existing_gke_location = "us-central1"
-
-  subnet_cidr   = "10.70.0.0/20"
-  pods_cidr     = "10.71.0.0/20"
-  services_cidr = "10.72.0.0/20"
 }
 
 provider "google" {}

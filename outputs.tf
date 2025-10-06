@@ -1,5 +1,5 @@
 output "project_id" {
-  description = "The GCP project ID where the Sierra environment is deployed"
+  description = "The GCP project ID where the InHost environment is deployed"
   value       = var.project_id
 }
 

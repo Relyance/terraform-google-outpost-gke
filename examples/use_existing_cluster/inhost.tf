@@ -7,7 +7,7 @@
 # For maintainability, replace hard-coded values with variables or outputs from other modules
 
 module "inhost" {
-  source = "Relyance-Ext/inhost/gcp"
+  source = "Relyance/outpost-gke/google"
 
   project_id = "your-project-id"
   region     = "us-central1"
